@@ -68,7 +68,8 @@ export default function ProfilePage({ onClose }) {
   async function removeSkill(skillId) {
     try {
       await api.delete(`/users/${selectedUser.id}/skills/${skillId}`)
-      setUserSkills(us => us.filter(u => u.skill.id !== skillId))
+      const refreshed = await api.get(`/users/${selectedUser.id}/skills`)
+      setUserSkills([...refreshed])
     } catch (e) { flash('❌ ' + e.message) }
   }
 
@@ -310,3 +311,5 @@ function btnStyle(color, primary = false) {
     fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
   }
 }
+
+

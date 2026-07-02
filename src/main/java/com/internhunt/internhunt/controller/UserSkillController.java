@@ -108,6 +108,7 @@ public class UserSkillController
         if (match.isEmpty()) return ResponseEntity.notFound().build();
 
         userSkillRepository.deleteById(match.get().getId());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }
+

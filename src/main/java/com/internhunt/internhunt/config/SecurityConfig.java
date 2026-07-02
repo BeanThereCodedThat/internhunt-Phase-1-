@@ -6,21 +6,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Security configuration.
- *
- * CSRF is disabled because:
- *   1. This is a single-user local application with no login/session.
- *   2. The frontend is a separate Vite dev server (different origin) using
- *      fetch() calls — it has no mechanism to read or forward a CSRF token.
- *   3. CSRF attacks require a browser session cookie carrying auth state.
- *      Since there is no auth here, there is nothing for CSRF to protect.
- *
- * If/when multi-user auth is added (Phase 4), revisit this — either enable
- * CSRF with a SameSite cookie strategy, or switch to stateless JWT (which
- * is inherently CSRF-safe since tokens are sent in headers, not cookies).
- */
+import java.util.List;
+import java.util.Map;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig
@@ -30,10 +22,22 @@ public class SecurityConfig
     {
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()
             );
-
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource()
+    {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.setCorsConfigurations(Map.of("/**", config));
+        return source;
     }
 }

@@ -46,8 +46,8 @@ export default function App() {
         remote: remote === '' ? null : remote === 'true',
       })
       setJobs(data.content || [])
-      setTotal(data.totalElements || 0)
-      setTotalPages(data.totalPages || 0)
+      setTotal(data.page?.totalElements || 0)
+      setTotalPages(data.page?.totalPages || 0)
       setPage(pg)
 
       // Fire-and-forget — badges just show "no data" until this resolves.

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { fetchJobs, fetchMatchScores } from './api'
 import JobCard from './components/JobCard'
 import JobModal from './components/JobModal'
@@ -9,12 +10,22 @@ import ApplicationTracker from './components/ApplicationTracker'
 import ProfilePage from './pages/ProfilePage'
 
 const PAGE_SIZE = 18
-
-// Hardcoded to user 1 for single-user Phase 1 setup.
-// In Phase 2+ this would come from auth.
 const ACTIVE_USER_ID = 1
 
 export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Board routeType="" />} />
+      <Route path="/internships" element={<Board routeType="internship" />} />
+      <Route path="/jobs" element={<Board routeType="full_time" />} />
+    </Routes>
+  )
+}
+
+function Board({ routeType }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+
   const [jobs,       setJobs]       = useState([])
   const [total,      setTotal]      = useState(0)
   const [page,       setPage]       = useState(0)
@@ -26,10 +37,10 @@ export default function App() {
 
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('')
-  const [type,   setType]   = useState('')
   const [remote, setRemote] = useState('')
+  // type is now driven by the route, not local filter state
+  const type = routeType
 
-  // Panel state
   const [showProfile,      setShowProfile]      = useState(false)
   const [showNotifs,       setShowNotifs]       = useState(false)
   const [showApplications, setShowApplications] = useState(false)
@@ -50,7 +61,6 @@ export default function App() {
       setTotalPages(data.page?.totalPages || 0)
       setPage(pg)
 
-      // Fire-and-forget — badges just show "no data" until this resolves.
       const ids = (data.content || []).map(j => j.id)
       fetchMatchScores(ids, ACTIVE_USER_ID).then(setScores)
     } catch (e) {
@@ -60,14 +70,12 @@ export default function App() {
     }
   }, [search, source, type, remote])
 
-  // Debounce search
   useEffect(() => {
     clearTimeout(searchTimeout.current)
     searchTimeout.current = setTimeout(() => { load(0) }, 300)
     return () => clearTimeout(searchTimeout.current)
   }, [load])
 
-  // Poll unread count every 60s
   useEffect(() => {
     async function checkUnread() {
       try {
@@ -91,7 +99,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Header ── */}
+      {/* -- Header -- */}
       <header style={{
         background: 'var(--bg2)',
         borderBottom: '1px solid var(--border)',
@@ -104,9 +112,17 @@ export default function App() {
         top: 0,
         zIndex: 50,
       }}>
-        <div style={{ fontFamily: 'var(--font-head)', fontWeight: 800, fontSize: '1.35rem', letterSpacing: '-0.02em' }}>
+        <div style={{ fontFamily: 'var(--font-head)', fontWeight: 800, fontSize: '1.35rem', letterSpacing: '-0.02em', cursor: 'pointer' }}
+             onClick={() => navigate('/')}>
           Intern<span style={{ color: 'var(--accent)' }}>Hunt</span>
         </div>
+
+        {/* Nav tabs */}
+        <nav style={{ display: 'flex', gap: 4 }}>
+          <NavTab active={location.pathname === '/'} onClick={() => navigate('/')}>All</NavTab>
+          <NavTab active={location.pathname === '/internships'} onClick={() => navigate('/internships')}>Internships</NavTab>
+          <NavTab active={location.pathname === '/jobs'} onClick={() => navigate('/jobs')}>Jobs</NavTab>
+        </nav>
 
         <div style={{ flex: 1, maxWidth: 520 }}>
           <SearchInput value={search} onChange={setSearch} />
@@ -116,47 +132,20 @@ export default function App() {
           {total.toLocaleString()} listings
         </div>
 
-        {/* Header action buttons */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-
-          {/* Applications button */}
-          <HeaderBtn
-            onClick={() => setShowApplications(true)}
-            title="Application Tracker"
-          >
-            📋
-          </HeaderBtn>
-
-          {/* Notifications button */}
-          <HeaderBtn
-            onClick={() => setShowNotifs(true)}
-            title="Notifications"
-            badge={unreadCount > 0 ? unreadCount : null}
-          >
-            🔔
-          </HeaderBtn>
-
-          {/* Profile button */}
-          <HeaderBtn
-            onClick={() => setShowProfile(true)}
-            title="Profile"
-            primary
-          >
-            👤 Profile
-          </HeaderBtn>
+          <HeaderBtn onClick={() => setShowApplications(true)} title="Application Tracker">??</HeaderBtn>
+          <HeaderBtn onClick={() => setShowNotifs(true)} title="Notifications" badge={unreadCount > 0 ? unreadCount : null}>??</HeaderBtn>
+          <HeaderBtn onClick={() => setShowProfile(true)} title="Profile" primary>?? Profile</HeaderBtn>
         </div>
       </header>
 
-      {/* ── Stats Bar ── */}
+      {/* -- Stats Bar -- */}
       <StatsBar key={statsKey} />
 
-      {/* ── Body ── */}
+      {/* -- Body -- */}
       <div style={{ display: 'flex', flex: 1, maxWidth: 1400, margin: '0 auto', width: '100%', padding: '24px 24px' }}>
 
-        {/* ── Sidebar ── */}
         <aside style={{ width: 240, flexShrink: 0, marginRight: 28, display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Filters */}
           <div style={{
             background: 'var(--bg2)',
             border: '1px solid var(--border)',
@@ -179,11 +168,14 @@ export default function App() {
                 ))}
               </FilterGroup>
 
-              <FilterGroup label="Type">
-                {[['', 'All'], ['internship', 'Internship'], ['full_time', 'Full-time'], ['contract', 'Contract']].map(([v, l]) => (
-                  <FilterChip key={v} active={type === v} onClick={() => setType(v)}>{l}</FilterChip>
-                ))}
-              </FilterGroup>
+              {/* Type filter only shown on the "All" route � /internships and /jobs already lock it */}
+              {routeType === '' && (
+                <FilterGroup label="Type">
+                  {[['', 'All'], ['internship', 'Internship'], ['full_time', 'Full-time'], ['contract', 'Contract']].map(([v, l]) => (
+                    <FilterChip key={v} active={false} onClick={() => navigate(v === 'internship' ? '/internships' : v === 'full_time' ? '/jobs' : '/')}>{l}</FilterChip>
+                  ))}
+                </FilterGroup>
+              )}
 
               <FilterGroup label="Location">
                 {[['', 'All'], ['true', 'Remote'], ['false', 'Onsite']].map(([v, l]) => (
@@ -192,9 +184,9 @@ export default function App() {
               </FilterGroup>
             </div>
 
-            {(source || type || remote) && (
+            {(source || remote) && (
               <button
-                onClick={() => { setSource(''); setType(''); setRemote('') }}
+                onClick={() => { setSource(''); setRemote('') }}
                 style={{ marginTop: 14, background: 'none', color: 'var(--accent)', fontSize: '0.78rem', fontWeight: 600, padding: 0, border: 'none', cursor: 'pointer' }}
               >
                 Clear all filters
@@ -202,19 +194,14 @@ export default function App() {
             )}
           </div>
 
-          {/* Scraper panel */}
           <ScraperPanel onScraped={handleScraped} />
         </aside>
 
-        {/* ── Job Grid ── */}
         <main style={{ flex: 1, minWidth: 0 }}>
-
-          {/* Active filter tags */}
-          {(source || type || remote || search) && (
+          {(source || remote || search) && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               {search && <ActiveFilter label={`"${search}"`} onRemove={() => setSearch('')} />}
               {source && <ActiveFilter label={source === 'company_careers' ? 'Companies' : source} onRemove={() => setSource('')} />}
-              {type   && <ActiveFilter label={type} onRemove={() => setType('')} />}
               {remote && <ActiveFilter label={remote === 'true' ? 'Remote' : 'Onsite'} onRemove={() => setRemote('')} />}
               <span style={{ color: 'var(--muted)', fontSize: '0.8rem', alignSelf: 'center' }}>
                 {total.toLocaleString()} result{total !== 1 ? 's' : ''}
@@ -238,7 +225,7 @@ export default function App() {
 
               {totalPages > 1 && (
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 32, flexWrap: 'wrap' }}>
-                  <PageBtn disabled={page === 0} onClick={() => load(page - 1)}>← Prev</PageBtn>
+                  <PageBtn disabled={page === 0} onClick={() => load(page - 1)}>? Prev</PageBtn>
                   {Array.from({ length: Math.min(totalPages, 7) }).map((_, i) => {
                     const p = totalPages <= 7 ? i
                       : page < 4 ? i
@@ -248,7 +235,7 @@ export default function App() {
                       <PageBtn key={p} active={p === page} onClick={() => load(p)}>{p + 1}</PageBtn>
                     )
                   })}
-                  <PageBtn disabled={page >= totalPages - 1} onClick={() => load(page + 1)}>Next →</PageBtn>
+                  <PageBtn disabled={page >= totalPages - 1} onClick={() => load(page + 1)}>Next ?</PageBtn>
                 </div>
               )}
             </>
@@ -256,7 +243,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* ── Modals / Panels ── */}
       {selected && <JobModal job={selected} onClose={() => setSelected(null)} userId={ACTIVE_USER_ID} />}
       {showProfile && <ProfilePage onClose={() => setShowProfile(false)} />}
       {showNotifs && (
@@ -275,7 +261,25 @@ export default function App() {
   )
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
+// --- Sub-components -----------------------------------------
+
+function NavTab({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? 'var(--accent)' : 'transparent',
+      color: active ? '#fff' : 'var(--muted)',
+      border: 'none',
+      borderRadius: 8,
+      padding: '6px 14px',
+      fontSize: '0.85rem',
+      fontWeight: active ? 600 : 500,
+      cursor: 'pointer',
+      transition: 'all 0.15s',
+    }}>
+      {children}
+    </button>
+  )
+}
 
 function HeaderBtn({ onClick, title, children, badge, primary }) {
   const [hovered, setHovered] = useState(false)
@@ -319,11 +323,11 @@ function HeaderBtn({ onClick, title, children, badge, primary }) {
 function SearchInput({ value, onChange }) {
   return (
     <div style={{ position: 'relative' }}>
-      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '1rem', pointerEvents: 'none' }}>🔍</span>
+      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '1rem', pointerEvents: 'none' }}>??</span>
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="Search jobs, companies, skills…"
+        placeholder="Search jobs, companies, skills�"
         style={{
           width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
           borderRadius: 9, padding: '8px 14px 8px 38px', color: 'var(--text)',
@@ -368,7 +372,7 @@ function ActiveFilter({ label, onRemove }) {
       fontSize: '0.78rem', fontWeight: 600,
     }}>
       {label}
-      <button onClick={onRemove} style={{ background: 'none', color: 'var(--accent)', fontSize: '1rem', lineHeight: 1, paddingBottom: 1, border: 'none', cursor: 'pointer' }}>×</button>
+      <button onClick={onRemove} style={{ background: 'none', color: 'var(--accent)', fontSize: '1rem', lineHeight: 1, paddingBottom: 1, border: 'none', cursor: 'pointer' }}>�</button>
     </span>
   )
 }
@@ -411,7 +415,7 @@ function SkeletonCard() {
 function Empty() {
   return (
     <div style={{ textAlign: 'center', padding: '80px 20px', color: 'var(--muted)' }}>
-      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🔍</div>
+      <div style={{ fontSize: '3rem', marginBottom: 16 }}>??</div>
       <div style={{ fontFamily: 'var(--font-head)', fontSize: '1.2rem', color: 'var(--text)', marginBottom: 8 }}>No listings found</div>
       <div style={{ fontSize: '0.9rem' }}>Try different filters or run a scraper to fetch new listings.</div>
     </div>

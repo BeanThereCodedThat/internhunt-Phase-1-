@@ -57,3 +57,5 @@ out/
 # VS Code
 .history/
 src/main/resources/application.properties
+
+meesho_raw.json

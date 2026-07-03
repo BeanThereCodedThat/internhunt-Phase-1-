@@ -607,46 +607,40 @@ public class CompanyCareersScrapers implements JobScraper
         List<JobListing> jobs = new ArrayList<>();
         try
         {
-            int i = 0;
-            while (i < json.length())
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(json);
+            if (!root.isArray()) return jobs;
+
+            for (com.fasterxml.jackson.databind.JsonNode node : root)
             {
-                int objStart = json.indexOf("{", i);
-                if (objStart == -1) break;
-                int objEnd = objStart + 1;
-                int depth = 1;
-                while (objEnd < json.length() && depth > 0)
-                {
-                    char c = json.charAt(objEnd);
-                    if (c == '{') depth++;
-                    else if (c == '}') depth--;
-                    objEnd++;
-                }
-                String obj = json.substring(objStart, objEnd);
-
-                String title = extractString(obj, "\"text\":\"");
-                String hostedUrl = extractString(obj, "\"hostedUrl\":\"");
-                String applyUrl = extractString(obj, "\"applyUrl\":\"");
-                String loc = extractString(obj, "\"location\":\"");
-
+                String title = node.has("text") && !node.get("text").isNull() ? node.get("text").asText() : null;
+                String hostedUrl = node.has("hostedUrl") && !node.get("hostedUrl").isNull() ? node.get("hostedUrl").asText() : null;
+                String applyUrl = node.has("applyUrl") && !node.get("applyUrl").isNull() ? node.get("applyUrl").asText() : null;
                 String url = hostedUrl != null ? hostedUrl : applyUrl;
-                if (title != null && url != null && !title.isEmpty())
+
+                String loc = null;
+                com.fasterxml.jackson.databind.JsonNode categories = node.get("categories");
+                if (categories != null && categories.has("location") && !categories.get("location").isNull())
+                {
+                    loc = categories.get("location").asText();
+                }
+
+                if (title != null && url != null && !title.isEmpty() && !title.equalsIgnoreCase("What You Will Do")
+                        && !title.equalsIgnoreCase("About the Role") && !title.equalsIgnoreCase("Responsibilities")
+                        && !title.equalsIgnoreCase("Requirements") && title.length() > 5)
                 {
                     String location = loc != null && !loc.isEmpty() ? loc : defaultLocation;
                     boolean isRemote = location.toLowerCase().contains("remote");
 
-                    // Get description from commitment/additional
-                    String desc = extractString(obj, "\"description\":\"");
-                    if (desc != null) desc = desc.replace("\\n", "\n").replaceAll("<[^>]+>", "").trim();
+                    String desc = node.has("description") && !node.get("description").isNull() ? node.get("description").asText() : null;
                     if (desc != null && desc.length() > 2000) desc = desc.substring(0, 2000) + "...";
 
                     JobListing.ListingType type = title.toLowerCase().contains("intern")
                             ? JobListing.ListingType.internship
                             : JobListing.ListingType.full_time;
 
-                    jobs.add(buildJob(companyName, title, url.replace("\\/", "/"),
-                            location, isRemote, desc, type));
+                    jobs.add(buildJob(companyName, title, url, location, isRemote, desc, type));
                 }
-                i = objEnd;
             }
         }
         catch (Exception e) { System.err.println("[lever:" + companyName + "] " + e.getMessage()); }
@@ -718,7 +712,7 @@ public class CompanyCareersScrapers implements JobScraper
         job.setSource(source);
         job.setLocation(location != null && location.length() > 200 ? location.substring(0, 200) : location);
         job.setIsRemote(remote || (location != null && location.toLowerCase().contains("remote")));
-        job.setDescription(desc);
+        job.setDescription(desc != null ? org.jsoup.Jsoup.parse(desc).text() : null);
         job.setListingType(type);
         job.setStatus(JobListing.Status.ACTIVE);
         return job;
@@ -765,7 +759,7 @@ public class CompanyCareersScrapers implements JobScraper
         for (int i = start; i < json.length(); i++)
         {
             char c = json.charAt(i);
-            if (escaped) { sb.append(c); escaped = false; }
+            if (escaped) { if (c == 'n') sb.append('\n'); else if (c == 't') sb.append('\t'); else if (c == 'r') sb.append('\r'); else sb.append(c); escaped = false; }
             else if (c == '\\') escaped = true;
             else if (c == '"') break;
             else sb.append(c);
